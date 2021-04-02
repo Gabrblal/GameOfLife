@@ -13,20 +13,20 @@ file(GLOB SOURCE ${CMAKE_SOURCE_DIR}/src/*.cpp)
 set(SOURCE_INCLUDE ${CMAKE_SOURCE_DIR}/src)
 set(SFML_INCLUDE ${CMAKE_SOURCE_DIR}/lib/include)
 
-add_executable(executable ${SOURCE})
+add_executable(gameoflife ${SOURCE})
 
 target_link_libraries(
-    executable 
+    gameoflife 
     sfml-graphics
 )
 
 target_include_directories(
-    executable 
+    gameoflife 
     PUBLIC 
     ${SOURCE_INCLUDE} 
     ${SFML_INCLUDE}
 )
 
-target_compile_options(executable 
-    PUBLIC -g -std=c++17 -Wall -Werror
+target_compile_options(gameoflife 
+    PUBLIC -std=c++17 -Wall -Werror
 )
