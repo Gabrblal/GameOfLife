@@ -1,6 +1,9 @@
-# GameOfLife
+# Conway's Game Of Life
 
-Controls:
+A C++ and [SFML](https://www.sfml-dev.org/) implementation of [Conway's game of life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life). A cell survives if that are 2 or 3 cells around it, or else it dies. A cell comes into existence with exactly
+3 cells surviving around it.
+
+- Controls:
   - `space` - Pause and unpause
   - `escape` - Exit
   - `WASD` - Move the Camera
