@@ -6,7 +6,8 @@ A C++ and [SFML](https://www.sfml-dev.org/) implementation of [Conway's Game of 
 - Controls:
   - `space` - Pause and unpause
   - `escape` - Exit
-  - `WASD` - Move the Camera
+  - `WASD` - Pan the Camera
+  - `scroll` - Zoom in and out
   - `left click` - Set a tile
   - `right click` - Remove a tile
 
