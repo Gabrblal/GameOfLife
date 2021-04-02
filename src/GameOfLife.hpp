@@ -1,11 +1,10 @@
 #pragma once
 
 #include <vector>
-#include <tuple>
 
-// Simple POD for square data.
-struct Square {
-    Square(int x, int y, bool value)
+// Simple POD for tile data.
+struct Tile {
+    Tile(int x, int y, bool value)
         : x(x)
         , y(y)
         , value(value)
@@ -15,23 +14,25 @@ struct Square {
     bool value;
 };
 
-class Game
+class GameOfLife
 {
 public:
 
-    // Create a new blank game of life with grid of width X height.
-    Game(int width, int height);
+    // Create a new blank simulation with a grid of given width and height.
+    GameOfLife(int width, int height);
 
     // Generate a fun initial state.
     void InitialState();
 
-    // Advance the game by one step.
-    std::vector<Square> Advance();
+    // Advance the game by one step. Returns a vector of all the tiles that
+    // changed state.
+    std::vector<Tile> Advance();
 
-    // Returns all set
-    std::vector<Square> Space();
+    // Returns a vector of all tiles in the simulation space.
+    std::vector<Tile> Space();
 
-    // Update the value of a square.
+    // Update the value of a square at grid position (x, y) to the given value.
+    // If the position (x, y) is out of bounds, does nothing.
     void Update(int x, int y, bool value);
 
     // Set a square.
@@ -50,7 +51,6 @@ public:
     inline int Height() { return m_height; }
 
 private:
-
     // Vector of width * height bools describing the state of each square.
     std::vector<bool> m_space;
 

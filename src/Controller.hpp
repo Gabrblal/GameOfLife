@@ -2,17 +2,18 @@
 
 #include <SFML/Graphics.hpp>
 
-#include "Game.hpp"
-#include "GameView.hpp"
+#include "GameOfLife.hpp"
+#include "View.hpp"
 
 class Controller
 {
 public:
 
-    // Create a new controller and game.
+    // Create a new controller, passing through the width and height of the
+    // tile grid.
     Controller(int tile_width, int tile_height);
 
-    // Start the main game loop.
+    // Start the simulation loop.
     void Loop();
 
 private:
@@ -26,11 +27,16 @@ private:
     void HandleMousePress(sf::Event &event);
     void HandleMouseScroll(sf::Event &event);
 
-    std::unique_ptr<sf::RenderWindow> m_window;
-    GameView m_view;
-    Game m_model;
+    // View of the simulation.
+    View m_view;
 
+    // The simulation itself.
+    GameOfLife m_model;
+
+    // If the game is currently paused.
     bool m_paused;
+
+    // The current state of the movement keys.
     bool m_left;
     bool m_right;
     bool m_up;

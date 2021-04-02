@@ -1,19 +1,20 @@
-#include "GameController.hpp"
+#include "Controller.hpp"
 
-#include <algorithm>
 #include <vector>
-#include <iostream>
 
 Controller::Controller(int tile_width, int tile_height)
     : m_view(tile_width, tile_height)
     , m_model(tile_width, tile_height)
-    , m_paused()
+    , m_paused(false)
     , m_left(false)
     , m_right(false)
     , m_up(false)
     , m_down(false)
 {
+    // Initialise the simulation.
     m_model.InitialState();
+
+    // Update the view with the initial state.
     m_view.Update(m_model.Space());
 }
 
@@ -23,6 +24,8 @@ void Controller::Loop()
     {
         HandleEvents();
 
+        // If not paused, then advance the simulation and update the view with
+        // the updated data. Otherwise continue updating other things.
         if (!m_paused) {
             m_view.Update(m_model.Advance());
         }
@@ -79,18 +82,18 @@ void Controller::HandleKeyRelease(sf::Event &event)
 void Controller::HandleMovement()
 {
     if (m_left == m_right)
-        m_view.Horisontal(0.0);
+        m_view.PanHorisontal(View::MoveAction::Stay);
     else if (m_left)
-        m_view.Horisontal(-1.0);
+        m_view.PanHorisontal(View::MoveAction::Backward);
     else
-        m_view.Horisontal(1.0);
+        m_view.PanHorisontal(View::MoveAction::Forward);
 
     if (m_up == m_down)
-        m_view.Vertical(0.0);
+        m_view.PanVertical(View::MoveAction::Stay);
     else if (m_up)
-        m_view.Vertical(-1.0);
+        m_view.PanVertical(View::MoveAction::Forward);
     else
-        m_view.Vertical(1.0);
+        m_view.PanVertical(View::MoveAction::Backward);
 }
 
 void Controller::HandleResize(sf::Event &event)
@@ -100,11 +103,13 @@ void Controller::HandleResize(sf::Event &event)
 
 void Controller::HandleMousePress(sf::Event &event)
 {
+    // Get the tile clicked.
     sf::Vector2i tile = m_view.MapPixelToTile(
         event.mouseButton.x,
         event.mouseButton.y
     );
 
+    // If a left click occured, set the tile, otherwise remove it.
     if (event.mouseButton.button == sf::Mouse::Left) {
         m_model.Place(tile.x, tile.y);
         m_view.Update(tile.x, tile.y, true);
@@ -119,9 +124,9 @@ void Controller::HandleMousePress(sf::Event &event)
 void Controller::HandleMouseScroll(sf::Event &event)
 {
     if (event.mouseWheelScroll.delta < 0) {
-        m_view.Zoom(1.1);
+        m_view.Zoom(View::ZoomAction::In);
     }
     else {
-        m_view.Zoom(0.9);
+        m_view.Zoom(View::ZoomAction::Out);
     }
 }
