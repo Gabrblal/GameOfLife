@@ -14,13 +14,13 @@ if "%~1"=="debug" (
     g++ -std=c++17 @source.txt -g -o bin/gameoflife.exe -static -static-libgcc ^
     -Isrc -Ilib/SFML/include -Llib/SFML/lib -DSFML_STATIC ^
     -lsfml-graphics-s-d -lsfml-window-s-d -lsfml-network-s-d -lsfml-system-s-d ^
-    -lopengl32 -lfreetype -lwinmm -lgdi32 -lws2_32 -l winmm ^
+    -lopengl32 -lfreetype -lwinmm -lgdi32 -lws2_32 -lwinmm -mwindows^
     -Wall -Werror -Wpedantic
 ) else if "%~1"=="release" (
     g++ -std=c++17 @source.txt -o bin/gameoflife.exe -static -static-libgcc ^
     -Isrc -Ilib/SFML/include -Llib/SFML/lib -DSFML_STATIC ^
     -lsfml-graphics-s -lsfml-window-s -lsfml-network-s -lsfml-system-s ^
-    -lopengl32 -lfreetype -lwinmm -lgdi32 -lws2_32 -l winmm ^
+    -lopengl32 -lfreetype -lwinmm -lgdi32 -lws2_32 -lwinmm -mwindows ^
     -Wall -Werror -Wpedantic
 ) else (
     echo No build specified.
