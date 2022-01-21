@@ -1,5 +1,6 @@
 #pragma once
 
+#include <mutex>
 #include <vector>
 
 // Simple POD for tile data.
@@ -53,6 +54,7 @@ public:
 private:
     // Vector of width * height bools describing the state of each square.
     std::vector<bool> m_space;
+    std::mutex m_space_mutex;
 
     // Width and height of the game space
     int m_width;

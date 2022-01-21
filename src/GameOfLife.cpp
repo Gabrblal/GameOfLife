@@ -10,17 +10,22 @@ GameOfLife::GameOfLife(int width, int height)
 
 void GameOfLife::InitialState()
 {
+    int x = m_width / 2;
+    int y = m_height / 2;
+
     // Glider
-    Place(0, 2);
-    Place(1, 3);
-    Place(2, 1);
-    Place(2, 2);
-    Place(2, 3);
+    Place(x + 0, y + 2);
+    Place(x + 1, y + 3);
+    Place(x + 2, y + 1);
+    Place(x + 2, y + 2);
+    Place(x + 2, y + 3);
 }
 
 std::vector<Tile> GameOfLife::Advance()
 {
-    std::vector<Tile> tiles;
+    std::scoped_lock<std::mutex> lock(m_space_mutex);
+
+    std::vector<Tile> tiles {};
 
     // Return the number wrapped around between 0 and n. If a > n, then
     // repeat a - n until a < n.
@@ -41,16 +46,16 @@ std::vector<Tile> GameOfLife::Advance()
             int N = 0;
 
             // Loop through surrounding squares.
-            N += m_space.at(above * m_width + left );
-            N += m_space.at(above * m_width + x    );
-            N += m_space.at(above * m_width + right);
-            N += m_space.at(    y * m_width + left );
-            N += m_space.at(    y * m_width + right);
-            N += m_space.at(below * m_width + left );
-            N += m_space.at(below * m_width + x    );
-            N += m_space.at(below * m_width + right);
+            N += m_space[above * m_width + left ];
+            N += m_space[above * m_width + x    ];
+            N += m_space[above * m_width + right];
+            N += m_space[    y * m_width + left ];
+            N += m_space[    y * m_width + right];
+            N += m_space[below * m_width + left ];
+            N += m_space[below * m_width + x    ];
+            N += m_space[below * m_width + right];
 
-            bool alive = m_space.at(y * m_width + x);
+            bool alive = m_space[y * m_width + x];
 
             // These 6 lines of code make up the entire logic of this
             // simulation!
@@ -67,16 +72,16 @@ std::vector<Tile> GameOfLife::Advance()
     }
 
     // Apply changes, after the grid has been fully analysed.
-    for (Tile tile : tiles) {
-        int position = tile.y * m_width + tile.x;
-        m_space[position] = tile.value;
-    }
+    for (Tile &tile : tiles)
+        m_space[tile.y * m_width + tile.x] = tile.value;
 
     return tiles;
 }
 
 std::vector<Tile> GameOfLife::Space()
 {
+    std::scoped_lock<std::mutex> space_lock(m_space_mutex);
+
     std::vector<Tile> space;
     for (int y = 0; y < m_height; ++y) {
         for (int x = 0; x < m_width; ++x) {
@@ -89,6 +94,8 @@ std::vector<Tile> GameOfLife::Space()
 
 void GameOfLife::Update(int x, int y, bool value)
 {
+    std::scoped_lock<std::mutex> lock(m_space_mutex);
+
     if (x > m_width || x < 0) {
         return;
     }
@@ -110,6 +117,8 @@ void GameOfLife::Remove(int x, int y) {
 
 void GameOfLife::Reset()
 {
+    std::scoped_lock<std::mutex> lock(m_space_mutex);
+
     for (auto it = m_space.begin(); it != m_space.end(); it++) {
         *it = false;
     }

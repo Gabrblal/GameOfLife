@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 int View::s_padding = 1;
 int View::s_tile_size = 5;
@@ -10,20 +11,42 @@ sf::Color View::s_colour_on = sf::Color(0xFFFFFFFF);
 sf::Color View::s_colour_off = sf::Color(0x090909FF);
 sf::Color View::s_colour_background = sf::Color(0x000000FF);
 
-View::View(int tile_width, int tile_height)
+// Simple class for RAII style locking of a window.
+class WindowLock
+{
+public:
+
+    // Lock a window and set this thread to the active OpenGL target.
+    WindowLock(sf::RenderWindow &window, std::mutex &mutex)
+        : m_window(&window)
+        , m_mutex(&mutex)
+    {
+        m_mutex->lock();
+        m_window->setActive(true);
+    }
+
+    // Disable the window as the active OpenGL target and unlock.
+    ~WindowLock() {
+        m_window->setActive(false);
+        m_mutex->unlock();
+    }
+
+private:
+    sf::RenderWindow *m_window;
+    std::mutex *m_mutex;
+};
+
+View::View()
     : m_window()
     , m_texture()
     , m_view()
-    , m_tile_width(tile_width)
-    , m_tile_height(tile_height)
+    , m_tile_width(0)
+    , m_tile_height(0)
+    , m_pixel_width(0)
+    , m_pixel_height(0)
 {
-    CreateWindow();
-    CreateTexture(tile_width, tile_height);
-    CreateView();
-}
+    std::lock_guard<std::mutex> lock(m_resource_mutex);
 
-void View::CreateWindow()
-{
     // Determine the largest fullscreen mode.
     std::vector<sf::VideoMode> modes = sf::VideoMode::getFullscreenModes();
     auto mode = std::max_element(
@@ -42,24 +65,33 @@ void View::CreateWindow()
             sf::Style::Fullscreen
         )
     );
+
+    m_pixel_width = mode->width;
+    m_pixel_height = mode->height;
+
+    m_window->setActive(false);
 }
 
-void View::CreateTexture(int tile_width, int tile_height)
+View::~View()
 {
+    WindowLock window_lock(*m_window, m_resource_mutex);
+    m_window->close();
+}
+
+void View::Set(int tile_width, int tile_height)
+{
+    std::lock_guard<std::mutex> lock(m_resource_mutex);
+
     // Each tile has s_padding on all four sides, plus the tile inside of
     // width and height s_tile_size.
     m_texture.create(
-        (2 * s_padding + s_tile_size) * tile_width,
-        (2 * s_padding + s_tile_size) * tile_height
+        (2 * s_padding + s_tile_size) * tile_width + 3 * s_padding,
+        (2 * s_padding + s_tile_size) * tile_height + 3 * s_padding
     );
 
     // Drawing a texture flips it along the top of the screen, flip it back.
-    m_sprite.setScale(1.0, -1.0);
-    m_sprite.setPosition(0.0, m_texture.getSize().y);
-}
+    m_sprite.setScale(1.0, 1.0);
 
-void View::CreateView()
-{
     // Set the dimensions of the view to match the window.
     m_view.setSize(m_window->getSize().x, m_window->getSize().y);
 
@@ -73,8 +105,10 @@ void View::CreateView()
     m_window->setView(m_view);
 }
 
-void View::Update(std::vector<Tile> tiles)
+void View::Render(std::vector<Tile> tiles)
 {
+    WindowLock lock(*m_window, m_resource_mutex);
+
     // Create a square for rendering.
     sf::RectangleShape square;
     square.setSize(sf::Vector2f(s_tile_size, s_tile_size));
@@ -91,11 +125,13 @@ void View::Update(std::vector<Tile> tiles)
         m_texture.draw(square);
     }
 
-    Update();
+    m_texture.display();
 }
 
-void View::Update(int x, int y, bool value)
+void View::Render(int x, int y, bool value)
 {
+    WindowLock lock(*m_window, m_resource_mutex);
+
     // Create a new square and set it at the position (x, y)
     sf::RectangleShape square(sf::Vector2f(s_tile_size, s_tile_size));
     square.setPosition(sf::Vector2f(
@@ -110,29 +146,29 @@ void View::Update(int x, int y, bool value)
     // Change the square colour on the texture.
     m_texture.draw(square);
 
-    Update();
+    m_texture.display();
 }
 
-void View::Update()
+void View::Display()
 {
+    WindowLock window_lock(*m_window, m_resource_mutex);
+
     // Update the view.
     m_view.setCenter(m_view.getCenter() + m_moving);
     m_window->setView(m_view);
 
     m_window->clear(s_colour_background);
 
-    // Take a snapshot of the texture and put it into the sprite.
+    // Draw the sprite, that handles transformations of the texture.
     m_sprite.setTexture(m_texture.getTexture());
 
-    // Draw the sprite, that handles transformations of the texture.
-    m_window->draw(m_sprite);
-
     // Display it in the window.
+    m_window->draw(m_sprite);
     m_window->display();
 }
 
-sf::RenderWindow &View::Window() {
-    return *m_window;
+bool View::WaitEvent(sf::Event &event) {
+    return m_window->waitEvent(event);
 }
 
 void View::Zoom(ZoomAction action)
@@ -142,6 +178,7 @@ void View::Zoom(ZoomAction action)
     else
         m_view.zoom(0.9);
 
+    WindowLock window_lock(*m_window, m_resource_mutex);
     m_window->setView(m_view);
 }
 

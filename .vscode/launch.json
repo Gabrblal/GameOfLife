@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
       {
-        "name": "Debug GameOfLife",
+        "name": "Debug Game Of Life",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/bin/executable.exe",
+        "program": "${workspaceFolder}/bin/gameoflife.exe",
         "args": [],
         "stopAtEntry": false,
         "cwd": "${workspaceFolder}",
@@ -22,8 +22,8 @@
             "text": "-enable-pretty-printing",
             "ignoreFailures": true
           }
-        ]
+        ],
+        "preLaunchTask": "Game Of Life: Compile Debug"
       }
     ]
-  }
 }

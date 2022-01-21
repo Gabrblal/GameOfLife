@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <memory>
+#include <mutex>
 #include <SFML/Graphics.hpp>
 
 #include "GameOfLife.hpp"
@@ -10,33 +12,35 @@ class View
 public:
 
     // Constructs and initialises a new game of life view.
-    View(int tile_width, int tile_height);
+    View();
+    ~View();
 
-    // Create the window to draw the graphics into. Must be called in the main
-    // thread.
-    void CreateWindow();
-
-    // Create a new texture considering the tile grid width and height.
-    void CreateTexture(int tile_width, int tile_height);
-
-    // Create the initial view of the tile grid.
-    void CreateView();
+    void Set(int tile_width, int tile_height);
 
     // Check window state.
-    sf::RenderWindow &Window();
+    bool WaitEvent(sf::Event &event);
 
     // Update the texture, view and window, if many tiles have changed state.
     // Changes the colours of the tiles in the texture depending on their new
     // value.
-    void Update(std::vector<Tile> updates);
+    void Render(std::vector<Tile> updates);
 
     // Update the texture, view and window, if a specific tile has changed
     // value.
-    void Update(int x, int y, bool value);
+    void Render(int x, int y, bool value);
 
     // Update the texture, view and window. For changes that depend on current
     // state (e.g. panning).
-    void Update();
+    void Display();
+
+    // Get a pointer to the rendering window.
+    inline sf::RenderWindow &Window() { return *m_window; }
+
+    // Get the pixel width of the view.
+    inline int Width() { return m_pixel_width; }
+
+    // Get the pixel height of the view.
+    inline int Height() { return m_pixel_height; }
 
     // States for zooming.
     enum class ZoomAction {
@@ -70,6 +74,12 @@ private:
     // canvas of some width and height that we can change the colours of.
     sf::RenderTexture m_texture;
 
+    // Mutex for prevent concurrent use of the texture and window.
+    // TODO: Apparently the window needs to be active in the current thread to
+    // write to the texture, but shouldn't. Work out independent texture and
+    // window updates.
+    std::mutex m_resource_mutex;
+
     // The texture is frozen at a certain point captured by this sprite object.
     // After the texture image is captured we can make some transformations and
     // draw it into the world space.
@@ -82,6 +92,8 @@ private:
     // Dimensions of tiling.
     int m_tile_width;
     int m_tile_height;
+    std::atomic_int m_pixel_width;
+    std::atomic_int m_pixel_height;
 
     // Controls
     sf::Vector2f m_moving;

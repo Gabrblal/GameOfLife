@@ -2,47 +2,109 @@
 
 #include <vector>
 
-Controller::Controller(int tile_width, int tile_height)
-    : m_view(tile_width, tile_height)
-    , m_model(tile_width, tile_height)
+using namespace std::chrono;
+
+Controller::Controller()
+    : m_view()
+    , m_model(m_view.Width() / 20, m_view.Height() / 20)
+    , m_model_delta(100000)
+    , m_model_delta_minimum(100)
+    , m_model_delta_maximum(1000000)
+    , m_view_delta(6944)
+    , m_exit(false)
     , m_paused(false)
     , m_left(false)
     , m_right(false)
     , m_up(false)
     , m_down(false)
 {
+    m_view.Set(m_model.Width(), m_model.Height());
+
+    // Start the simulation.
+    m_model_thread = std::thread(&Controller::SimulationThread, this, std::ref(m_exit));
+    m_view_thread = std::thread(&Controller::ViewThread, this, std::ref(m_exit));
+
     // Initialise the simulation.
     m_model.InitialState();
 
     // Update the view with the initial state.
-    m_view.Update(m_model.Space());
+    m_view.Render(m_model.Space());
+    m_view.Display();
+}
+
+Controller::~Controller()
+{
+    m_exit = true;
+
+    if (m_model_thread.joinable())
+        m_model_thread.join();
+
+    if (m_view_thread.joinable())
+        m_view_thread.join();
+}
+
+void Controller::SimulationThread(std::atomic_bool &exit)
+{
+    std::unique_lock<std::mutex> lock(m_model_cv_mutex);
+    m_model.InitialState();
+
+    while (true) {
+
+        m_model_cv.wait_until(
+            lock,
+            high_resolution_clock::now() + microseconds(m_model_delta),
+            [&]{
+                // Return true for stop waiting.
+                return m_exit || m_paused;
+            }
+        );
+
+        // Check for exit signal
+        if (m_exit)
+            break;
+
+        // Catch spurious wakeups.
+        if (m_paused)
+            continue;
+
+        m_view.Render(m_model.Advance());
+    }
+}
+
+void Controller::ViewThread(std::atomic_bool &exit)
+{
+    std::unique_lock<std::mutex> lock(m_view_cv_mutex);
+
+    while (true) {
+
+        using namespace std::chrono;
+
+        m_model_cv.wait_until(
+            lock,
+            high_resolution_clock::now() + microseconds(m_view_delta),
+            [&]{
+                return m_exit.load();
+            }
+        );
+
+        // Check for exit signal
+        if (m_exit)
+            break;
+
+        m_view.Display();
+    }
 }
 
 void Controller::Loop()
 {
-    while (m_view.Window().isOpen())
-    {
-        HandleEvents();
-
-        // If not paused, then advance the simulation and update the view with
-        // the updated data. Otherwise continue updating other things.
-        if (!m_paused) {
-            m_view.Update(m_model.Advance());
-        }
-        else {
-            m_view.Update();
-        }
-    }
-}
-
-void Controller::HandleEvents()
-{
     sf::Event event;
-    while (m_view.Window().pollEvent(event))
+    while (!m_exit)
     {
+        m_view.WaitEvent(event);
+
         switch(event.type)
         {
-            case sf::Event::Closed             : m_view.Window().close();  break;
+            case sf::Event::Closed             : Exit(); return;           break;
             case sf::Event::KeyPressed         : HandleKeyPress(event);    break;
             case sf::Event::KeyReleased        : HandleKeyRelease(event);  break;
             case sf::Event::Resized            : HandleResize(event);      break;
@@ -53,16 +115,32 @@ void Controller::HandleEvents()
     }
 }
 
+void Controller::Exit()
+{
+    // Set exit flag.
+    m_exit = true;
+
+    // Notify all the threads if they are waiting.
+    m_model_cv.notify_all();
+    m_view_cv.notify_all();
+
+    // Join them.
+    m_model_thread.join();
+    m_view_thread.join();
+}
+
 void Controller::HandleKeyPress(sf::Event &event)
 {
     switch(event.key.code)
     {
-        case sf::Keyboard::Escape : m_view.Window().close(); break;
+        case sf::Keyboard::Escape : Exit(); break;
         case sf::Keyboard::Space  : m_paused = !m_paused;    break;
         case sf::Keyboard::W : m_up    = true; HandleMovement(); break;
         case sf::Keyboard::A : m_left  = true; HandleMovement(); break;
         case sf::Keyboard::S : m_down  = true; HandleMovement(); break;
         case sf::Keyboard::D : m_right = true; HandleMovement(); break;
+        case sf::Keyboard::Up   : HandleSpeed(true); break;
+        case sf::Keyboard::Down : HandleSpeed(false); break;
         default: break;
     }
 }
@@ -112,13 +190,12 @@ void Controller::HandleMousePress(sf::Event &event)
     // If a left click occured, set the tile, otherwise remove it.
     if (event.mouseButton.button == sf::Mouse::Left) {
         m_model.Place(tile.x, tile.y);
-        m_view.Update(tile.x, tile.y, true);
+        m_view.Render(tile.x, tile.y, true);
     }
     else {
         m_model.Remove(tile.x, tile.y);
-        m_view.Update(tile.x, tile.y, false);
+        m_view.Render(tile.x, tile.y, false);
     }
-
 }
 
 void Controller::HandleMouseScroll(sf::Event &event)
@@ -129,4 +206,18 @@ void Controller::HandleMouseScroll(sf::Event &event)
     else {
         m_view.Zoom(View::ZoomAction::Out);
     }
+}
+
+void Controller::HandleSpeed(bool increase)
+{
+    if (increase)
+        m_model_delta = m_model_delta / 2;
+    else
+        m_model_delta =  m_model_delta * 2;
+
+    if (m_model_delta < m_model_delta_minimum)
+        m_model_delta = m_model_delta_minimum;
+
+    else if (m_model_delta > m_model_delta_maximum)
+        m_model_delta = m_model_delta_maximum;
 }
