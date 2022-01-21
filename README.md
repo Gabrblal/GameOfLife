@@ -10,5 +10,7 @@ A C++ and [SFML](https://www.sfml-dev.org/) implementation of [Conway's Game of 
   - `scroll` - Zoom in and out
   - `left click` - Set a tile
   - `right click` - Remove a tile
+  - `up arrow` - Increase simulation speed.
+  - `down arrow` - Reduce simulation speed.
 
 ![gameoflife](https://user-images.githubusercontent.com/52615052/113376056-39ea8800-93b4-11eb-9e9e-4388e7ef3d65.gif)
