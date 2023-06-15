@@ -10,65 +10,114 @@
 #include "GameOfLife.hpp"
 #include "View.hpp"
 
+/**
+ * @brief The controller class owns the thread incrementing the game of life
+ * model, and the thread responsible for rendering the model. The controller
+ * handles user input and updates the model or view accordingly, or exits the
+ * application.
+ */
 class Controller
 {
 public:
 
-    // Create a new controller, passing through the width and height of the
-    // tile grid.
+    /**
+     * @brief Create the controller, the main singleton class of the
+     * application.
+     * 
+     * Starts the model and view threads, sets the model to the initial state,
+     * and displays the entire model space.
+     */
     Controller();
-    ~Controller();
 
-    // Start the simulation loop.
-    void Loop();
+    /**
+     * @brief The user input loop fetching events and performing actions
+     * depending on their values.
+     */
+    void main();
 
 private:
 
-    void SimulationThread(std::atomic_bool &exit);
-    void ViewThread(std::atomic_bool &exit);
+    /**
+     * @brief Joinable thread responsible for updating the simulation.
+     * 
+     * @param stop The stop signal issued to the thread to exit.
+     */
+    void simulation_thread(std::stop_token stop);
 
-    void Exit();
+    /**
+     * @brief Joinable thread for updating the view of the simulation.
+     * 
+     * @param stop The stop signal issued to the thread to exit.
+     */
+    void view_thread(std::stop_token stop);
 
-    // Event handling.
-    void HandleKeyPress(sf::Event &event);
-    void HandleKeyRelease(sf::Event &event);
-    void HandleMovement();
-    void HandleResize(sf::Event &event);
-    void HandleMousePress(sf::Event &event);
-    void HandleMouseScroll(sf::Event &event);
+    /**
+     * @brief Issues a stop request to the model and view threads.
+     */
+    void exit();
+
+    /// Event handling.
+    void handle_key_press(sf::Event &event);
+    void handle_key_release(sf::Event &event);
+    void handle_movement();
+    void handle_resize(sf::Event &event);
+    void handle_mouse_press(sf::Event &event);
+    void handle_mouse_scroll(sf::Event &event);
 
     // Increase or decrease the speed of the simulation.
-    void HandleSpeed(bool increase);
+    void handle_speed(bool increase);
 
-    View m_view; // View of the simulation.
-    GameOfLife m_model; // The simulation itself.
+    /// View of the simulation.
+    View m_view;
 
-    // Threads for running the simulation and updating the window, and for
-    // controlling each update rate.
-    std::thread m_model_thread;
-    std::thread m_view_thread;
-    std::condition_variable m_model_cv;
-    std::condition_variable m_view_cv;
-    std::mutex m_model_cv_mutex;
-    std::mutex m_view_cv_mutex;
+    // The game of life simulation that increments continuously.
+    GameOfLife m_model;
+
+    /// Thread updating the model.
+    std::jthread m_model_thread;
+
+    /// Thread updating the view of the model.
+    std::jthread m_view_thread;
+
+    // Condition variable for notifying the model to perform an update.
+    std::condition_variable_any m_model_condition;
+
+    // Condition variable for notifying the view to render.
+    std::condition_variable_any m_view_condition;
+
+    // Mutex protecting the model condition variable.
+    std::mutex m_model_condition_mutex;
+
+    // Mutex protecting the view condition variable.
+    std::mutex m_view_condition_mutex;
 
     // The amount of time between model updates.
-    std::atomic_int m_model_delta;
-    int m_model_delta_minimum;
-    int m_model_delta_maximum;
+    std::chrono::microseconds m_model_delta;
+
+    // Minimum increment between model increments.
+    std::chrono::microseconds m_model_delta_minimum;
+
+    // Maximum increment between model increments.
+    std::chrono::microseconds m_model_delta_maximum;
 
     // The amount of time between screen updates.
-    std::atomic_int m_view_delta;
+    std::chrono::microseconds m_view_delta;
 
-    // Exit signal.
-    std::atomic_bool m_exit;
+    // Stop signal to stop and join the model and view threads.
+    std::stop_source m_stop;
 
     // If the game is currently paused.
     std::atomic_bool m_paused;
 
-    // The current state of the movement keys.
+    // If left key is currently pressed.
     bool m_left;
+
+    // If the right key is currently pressed.
     bool m_right;
+
+    // If the up key is currently pressed.
     bool m_up;
+
+    // If the down key is currently pressed.
     bool m_down;
 };

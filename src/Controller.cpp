@@ -6,209 +6,195 @@ using namespace std::chrono;
 
 Controller::Controller()
     : m_view()
-    , m_model(m_view.Width() / 20, m_view.Height() / 20)
-    , m_model_delta(100000)
-    , m_model_delta_minimum(100)
-    , m_model_delta_maximum(1000000)
-    , m_view_delta(6944)
-    , m_exit(false)
+    , m_model(m_view.width() / 20, m_view.height() / 20)
+    , m_model_delta(100ms)
+    , m_model_delta_minimum(0s)
+    , m_model_delta_maximum(2s)
+    , m_view_delta(1s / 144s)
     , m_paused(false)
     , m_left(false)
     , m_right(false)
     , m_up(false)
     , m_down(false)
 {
-    m_view.Set(m_model.Width(), m_model.Height());
+    // Add a gilder to the centre of the game space.
+    m_model.add_glider();
 
-    // Start the simulation.
-    m_model_thread = std::thread(&Controller::SimulationThread, this, std::ref(m_exit));
-    m_view_thread = std::thread(&Controller::ViewThread, this, std::ref(m_exit));
+    m_view.set(m_model.width(), m_model.height());
 
-    // Initialise the simulation.
-    m_model.InitialState();
+    // Start the simulation thread first because the view thread depends on it.
+    m_model_thread = std::jthread(
+        &Controller::simulation_thread,
+        this,
+        m_stop.get_token()
+    );
+
+    // Start the thread updating the window.
+    m_view_thread = std::jthread(
+        &Controller::view_thread,
+        this,
+        m_stop.get_token()
+    );
 
     // Update the view with the initial state.
-    m_view.Render(m_model.Space());
-    m_view.Display();
+    m_view.render(m_model.space());
+    m_view.display();
 }
 
-Controller::~Controller()
+void Controller::simulation_thread(std::stop_token stop)
 {
-    m_exit = true;
+    std::unique_lock<std::mutex> lock(m_model_condition_mutex);
 
-    if (m_model_thread.joinable())
-        m_model_thread.join();
+    for (;;) {
 
-    if (m_view_thread.joinable())
-        m_view_thread.join();
-}
-
-void Controller::SimulationThread(std::atomic_bool &exit)
-{
-    std::unique_lock<std::mutex> lock(m_model_cv_mutex);
-    m_model.InitialState();
-
-    while (true) {
-
-        m_model_cv.wait_until(
+        m_model_condition.wait_until(
             lock,
-            high_resolution_clock::now() + microseconds(m_model_delta),
-            [&]{
-                // Return true for stop waiting.
-                return m_exit || m_paused;
-            }
+            stop,
+            high_resolution_clock::now() + m_model_delta,
+            [&]{ return m_paused.load(); }
         );
 
         // Check for exit signal
-        if (m_exit)
+        if (stop.stop_requested())
             break;
 
         // Catch spurious wakeups.
         if (m_paused)
             continue;
 
-        m_view.Render(m_model.Advance());
+        m_view.render(m_model.advance());
     }
 }
 
-void Controller::ViewThread(std::atomic_bool &exit)
+void Controller::view_thread(std::stop_token stop)
 {
-    std::unique_lock<std::mutex> lock(m_view_cv_mutex);
+    std::unique_lock<std::mutex> lock(m_view_condition_mutex);
 
-    while (true) {
+    for (;;) {
 
-        using namespace std::chrono;
-
-        m_model_cv.wait_until(
+        m_model_condition.wait_until(
             lock,
-            high_resolution_clock::now() + microseconds(m_view_delta),
-            [&]{
-                return m_exit.load();
-            }
+            stop,
+            high_resolution_clock::now() + m_view_delta,
+            [&]{ return false; }
         );
 
         // Check for exit signal
-        if (m_exit)
+        if (stop.stop_requested())
             break;
 
-        m_view.Display();
+        m_view.display();
     }
 }
 
-void Controller::Loop()
+void Controller::main()
 {
+    // Stop signal on the main thread.
+    std::stop_token stop = m_stop.get_token();
     sf::Event event;
-    while (!m_exit)
+
+    while (!stop.stop_requested())
     {
-        m_view.WaitEvent(event);
+        m_view.window().waitEvent(event);
 
         switch(event.type)
         {
-            case sf::Event::Closed             : Exit(); return;           break;
-            case sf::Event::KeyPressed         : HandleKeyPress(event);    break;
-            case sf::Event::KeyReleased        : HandleKeyRelease(event);  break;
-            case sf::Event::Resized            : HandleResize(event);      break;
-            case sf::Event::MouseButtonPressed : HandleMousePress(event);  break;
-            case sf::Event::MouseWheelScrolled : HandleMouseScroll(event); break;
+            case sf::Event::Closed             : exit(); return;           break;
+            case sf::Event::KeyPressed         : handle_key_press(event);    break;
+            case sf::Event::KeyReleased        : handle_key_release(event);  break;
+            case sf::Event::Resized            : handle_resize(event);      break;
+            case sf::Event::MouseButtonPressed : handle_mouse_press(event);  break;
+            case sf::Event::MouseWheelScrolled : handle_mouse_scroll(event); break;
             default: break;
         }
     }
 }
 
-void Controller::Exit()
+void Controller::exit()
 {
-    // Set exit flag.
-    m_exit = true;
-
-    // Notify all the threads if they are waiting.
-    m_model_cv.notify_all();
-    m_view_cv.notify_all();
-
-    // Join them.
-    m_model_thread.join();
-    m_view_thread.join();
+    m_stop.request_stop();
 }
 
-void Controller::HandleKeyPress(sf::Event &event)
+void Controller::handle_key_press(sf::Event &event)
 {
     switch(event.key.code)
     {
-        case sf::Keyboard::Escape : Exit(); break;
+        case sf::Keyboard::Escape : exit(); break;
         case sf::Keyboard::Space  : m_paused = !m_paused;    break;
-        case sf::Keyboard::W : m_up    = true; HandleMovement(); break;
-        case sf::Keyboard::A : m_left  = true; HandleMovement(); break;
-        case sf::Keyboard::S : m_down  = true; HandleMovement(); break;
-        case sf::Keyboard::D : m_right = true; HandleMovement(); break;
-        case sf::Keyboard::Up   : HandleSpeed(true); break;
-        case sf::Keyboard::Down : HandleSpeed(false); break;
+        case sf::Keyboard::W : m_up    = true; handle_movement(); break;
+        case sf::Keyboard::A : m_left  = true; handle_movement(); break;
+        case sf::Keyboard::S : m_down  = true; handle_movement(); break;
+        case sf::Keyboard::D : m_right = true; handle_movement(); break;
+        case sf::Keyboard::Up   : handle_speed(true); break;
+        case sf::Keyboard::Down : handle_speed(false); break;
         default: break;
     }
 }
 
-void Controller::HandleKeyRelease(sf::Event &event)
+void Controller::handle_key_release(sf::Event &event)
 {
     switch(event.key.code)
     {
-        case sf::Keyboard::W : m_up    = false; HandleMovement(); break;
-        case sf::Keyboard::A : m_left  = false; HandleMovement(); break;
-        case sf::Keyboard::S : m_down  = false; HandleMovement(); break;
-        case sf::Keyboard::D : m_right = false; HandleMovement(); break;
+        case sf::Keyboard::W : m_up    = false; handle_movement(); break;
+        case sf::Keyboard::A : m_left  = false; handle_movement(); break;
+        case sf::Keyboard::S : m_down  = false; handle_movement(); break;
+        case sf::Keyboard::D : m_right = false; handle_movement(); break;
         default: break;
     }
 }
 
-void Controller::HandleMovement()
+void Controller::handle_movement()
 {
     if (m_left == m_right)
-        m_view.PanHorisontal(View::MoveAction::Stay);
+        m_view.pan_horisontal(View::MoveAction::STAY);
     else if (m_left)
-        m_view.PanHorisontal(View::MoveAction::Backward);
+        m_view.pan_horisontal(View::MoveAction::BACKWARD);
     else
-        m_view.PanHorisontal(View::MoveAction::Forward);
+        m_view.pan_horisontal(View::MoveAction::FORWARD);
 
     if (m_up == m_down)
-        m_view.PanVertical(View::MoveAction::Stay);
+        m_view.pan_vertical(View::MoveAction::STAY);
     else if (m_up)
-        m_view.PanVertical(View::MoveAction::Forward);
+        m_view.pan_vertical(View::MoveAction::FORWARD);
     else
-        m_view.PanVertical(View::MoveAction::Backward);
+        m_view.pan_vertical(View::MoveAction::BACKWARD);
 }
 
-void Controller::HandleResize(sf::Event &event)
+void Controller::handle_resize(sf::Event &event)
 {
     return;
 }
 
-void Controller::HandleMousePress(sf::Event &event)
+void Controller::handle_mouse_press(sf::Event &event)
 {
     // Get the tile clicked.
-    sf::Vector2i tile = m_view.MapPixelToTile(
+    sf::Vector2i tile = m_view.map_pixel_to_tile(
         event.mouseButton.x,
         event.mouseButton.y
     );
 
     // If a left click occured, set the tile, otherwise remove it.
     if (event.mouseButton.button == sf::Mouse::Left) {
-        m_model.Place(tile.x, tile.y);
-        m_view.Render(tile.x, tile.y, true);
+        m_model.place(tile.x, tile.y);
+        m_view.render(tile.x, tile.y, true);
     }
     else {
-        m_model.Remove(tile.x, tile.y);
-        m_view.Render(tile.x, tile.y, false);
+        m_model.remove(tile.x, tile.y);
+        m_view.render(tile.x, tile.y, false);
     }
 }
 
-void Controller::HandleMouseScroll(sf::Event &event)
+void Controller::handle_mouse_scroll(sf::Event &event)
 {
     if (event.mouseWheelScroll.delta < 0) {
-        m_view.Zoom(View::ZoomAction::In);
+        m_view.zoom(View::ZoomAction::IN);
     }
     else {
-        m_view.Zoom(View::ZoomAction::Out);
+        m_view.zoom(View::ZoomAction::OUT);
     }
 }
 
-void Controller::HandleSpeed(bool increase)
+void Controller::handle_speed(bool increase)
 {
     if (increase)
         m_model_delta = m_model_delta / 2;

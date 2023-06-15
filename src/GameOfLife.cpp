@@ -8,20 +8,20 @@ GameOfLife::GameOfLife(int width, int height)
     , m_height(height)
 {}
 
-void GameOfLife::InitialState()
+void GameOfLife::add_glider()
 {
     int x = m_width / 2;
     int y = m_height / 2;
 
     // Glider
-    Place(x + 0, y + 2);
-    Place(x + 1, y + 3);
-    Place(x + 2, y + 1);
-    Place(x + 2, y + 2);
-    Place(x + 2, y + 3);
+    place(x + 0, y + 2);
+    place(x + 1, y + 3);
+    place(x + 2, y + 1);
+    place(x + 2, y + 2);
+    place(x + 2, y + 3);
 }
 
-std::vector<Tile> GameOfLife::Advance()
+std::vector<Tile> GameOfLife::advance()
 {
     std::scoped_lock<std::mutex> lock(m_space_mutex);
 
@@ -63,10 +63,10 @@ std::vector<Tile> GameOfLife::Advance()
                 continue;
             }
             else if (!alive && N == 3) {
-                tiles.push_back({x, y, true});
+                tiles.emplace_back(x, y, true);
             }
             else if (alive) {
-                tiles.push_back({x, y, false});
+                tiles.emplace_back(x, y, false);
             }
         }
     }
@@ -78,21 +78,21 @@ std::vector<Tile> GameOfLife::Advance()
     return tiles;
 }
 
-std::vector<Tile> GameOfLife::Space()
+std::vector<Tile> GameOfLife::space()
 {
     std::scoped_lock<std::mutex> space_lock(m_space_mutex);
 
     std::vector<Tile> space;
     for (int y = 0; y < m_height; ++y) {
         for (int x = 0; x < m_width; ++x) {
-            space.push_back({x, y, m_space.at(y * m_width + x)});
+            space.emplace_back(x, y, m_space.at(y * m_width + x));
         }
     }
 
     return space;
 }
 
-void GameOfLife::Update(int x, int y, bool value)
+void GameOfLife::update(int x, int y, bool value)
 {
     std::scoped_lock<std::mutex> lock(m_space_mutex);
 
@@ -107,19 +107,8 @@ void GameOfLife::Update(int x, int y, bool value)
     m_space[y * m_width + x] = value;
 }
 
-void GameOfLife::Place(int x, int y) {
-    Update(x, y, true);
-}
-
-void GameOfLife::Remove(int x, int y) {
-    Update(x, y, false);
-}
-
-void GameOfLife::Reset()
+void GameOfLife::clear()
 {
     std::scoped_lock<std::mutex> lock(m_space_mutex);
-
-    for (auto it = m_space.begin(); it != m_space.end(); it++) {
-        *it = false;
-    }
+    m_space = std::vector<bool>(m_width * m_height, false);
 }

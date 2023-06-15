@@ -1,5 +1,7 @@
 bin
 lib
+source.txt
+.vscode/settings.json
 
 # Prerequisites
 *.d

@@ -3,60 +3,121 @@
 #include <mutex>
 #include <vector>
 
-// Simple POD for tile data.
+/**
+ * @brief Data of a tile.
+ */
 struct Tile {
-    Tile(int x, int y, bool value)
-        : x(x)
-        , y(y)
-        , value(value)
-    {}
     int x;
     int y;
     bool value;
 };
 
+/**
+ * @brief Class implementing Conways game of life.
+ * 
+ * Each tile in the game space is either dead or alive, and is updated on each
+ * iteration depending on the states of the surrounding tiles.
+ * - A tile stays alive 2 or 3 immediate tiles are alive.
+ * - A tile becomes alive if exactly 3 immediate tiles are alive.
+ * - A tile dies otherwise.
+ */
 class GameOfLife
 {
 public:
 
-    // Create a new blank simulation with a grid of given width and height.
+    /**
+     * @brief Instantiate a game of life with a grid of provided width and 
+     * height.
+     * 
+     * @param width The width of the grid in tiles.
+     * @param height The height of the grid in tiles.
+     */
     GameOfLife(int width, int height);
 
-    // Generate a fun initial state.
-    void InitialState();
+    /**
+     * @brief Add a glider to the centre of the game space.
+     */
+    void add_glider();
 
-    // Advance the game by one step. Returns a vector of all the tiles that
-    // changed state.
-    std::vector<Tile> Advance();
+    /**
+     * @brief Advances the game of life state by one step, returning all the
+     * files that changed state.
+     * 
+     * @return The tiles that changed state that step.
+     */
+    std::vector<Tile> advance();
 
-    // Returns a vector of all tiles in the simulation space.
-    std::vector<Tile> Space();
+    /**
+     * @brief Gets the state of all tiles.
+     * 
+     * @return The state of all tiles.
+     */
+    std::vector<Tile> space();
 
-    // Update the value of a square at grid position (x, y) to the given value.
-    // If the position (x, y) is out of bounds, does nothing.
-    void Update(int x, int y, bool value);
+    /**
+     * @brief Updates the value of a tile at position (x, y) to alive or not. If
+     * the position is out of bounds then does nothing.
+     * 
+     * @param x The x position in the grid.
+     * @param y The y position in the grid.
+     * @param alive If that position is alive.
+     */
+    void update(int x, int y, bool alive);
 
-    // Set a square.
-    void Place(int x, int y);
+    /**
+     * @brief Sets a tile to alive at (x, y). If the position is out of bounds
+     * then does nothing.
+     * 
+     * @param x The x position in the grid.
+     * @param y The y position in the grid.
+     */
+    inline void place(int x, int y) {
+        update(x, y, true);
+    }
 
-    // Unset a square.
-    void Remove(int x, int y);
+    /**
+     * @brief Clears a tile to dead at (x, y). If the position is out of bounds
+     * then does nothing.
+     * 
+     * @param x The x position in the grid.
+     * @param y The y position in the grid.
+     */
+    inline void remove(int x, int y) {
+        update(x, y, false);
+    }
 
-    // Reset the game.
-    void Reset();
+    /**
+     * @brief Sets all tiles to dead.
+     */
+    void clear();
 
-    // Return the height of the game space.
-    inline int Width() { return m_width; }
+    /**
+     * @brief Get the width of the simulation space.
+     * @return The width of the simulation space.
+     */
+    inline int width() {
+        return m_width;
+    }
 
-    // Return the width of the game space.
-    inline int Height() { return m_height; }
+    /**
+     * @brief Get the height of the simulation space.
+     * @return The height of the simulation space.
+     */
+    inline int height() {
+        return m_height;
+    }
 
 private:
-    // Vector of width * height bools describing the state of each square.
+
+    /// Vector of width * height booleans with the state of each square.
     std::vector<bool> m_space;
+
+    /// Mutex protecting concurrent access to the game space.
     std::mutex m_space_mutex;
 
-    // Width and height of the game space
+    /// The width of the game space.
     int m_width;
+
+    /// The height of the game space.
     int m_height;
 };

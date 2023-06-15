@@ -3,6 +3,6 @@
 int main(int argc, char **argv)
 {
     Controller controller {};
-    controller.Loop();
+    controller.main();
     return 0;
 }
