@@ -1,16 +1,30 @@
 #pragma once
 
 #include <mutex>
+#include <unordered_set>
 #include <vector>
 
-/**
- * @brief Data of a tile.
- */
+/// Type describing a tile.
 struct Tile {
     int x;
     int y;
-    bool value;
 };
+
+// Hash function for Tile.
+template<>
+struct std::hash<Tile>
+{
+    size_t operator()(const Tile& tile) const noexcept
+    {
+        size_t hx = hash<int>{}(tile.x);
+        size_t hy = hash<int>{}(tile.y);
+        return hx ^ (hy + 0x9e3779b9 + (hx << 6) + (hx >> 2));
+    }
+};
+
+inline bool operator==(const Tile &left, const Tile &right) {
+    return left.x == right.x && left.y == right.y;
+}
 
 /**
  * @brief Class implementing Conways game of life.
@@ -24,6 +38,9 @@ struct Tile {
 class GameOfLife
 {
 public:
+
+    /// Type describing all alive tiles.
+    using Space = std::unordered_set<Tile>;
 
     /**
      * @brief Instantiate a game of life with a grid of provided width and 
@@ -40,19 +57,14 @@ public:
     void add_glider();
 
     /**
-     * @brief Advances the game of life state by one step, returning all the
-     * files that changed state.
-     * 
-     * @return The tiles that changed state that step.
+     * @brief Advances the game of life state by one step.
      */
-    std::vector<Tile> advance();
+    void advance();
 
     /**
-     * @brief Gets the state of all tiles.
-     * 
-     * @return The state of all tiles.
+     * @brief Gets the alive tiles
      */
-    std::vector<Tile> space();
+    std::unordered_set<Tile> space();
 
     /**
      * @brief Updates the value of a tile at position (x, y) to alive or not. If
@@ -110,10 +122,10 @@ public:
 private:
 
     /// Vector of width * height booleans with the state of each square.
-    std::vector<bool> m_space;
+    Space m_space;
 
     /// Mutex protecting concurrent access to the game space.
-    std::mutex m_space_mutex;
+    std::mutex m_mutex;
 
     /// The width of the game space.
     int m_width;

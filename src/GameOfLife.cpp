@@ -1,9 +1,11 @@
 #include "GameOfLife.hpp"
 
 #include <cmath>
+#include <unordered_map>
+#include <array>
 
 GameOfLife::GameOfLife(int width, int height)
-    : m_space(width * height, false)
+    : m_space()
     , m_width(width)
     , m_height(height)
 {}
@@ -21,94 +23,109 @@ void GameOfLife::add_glider()
     place(x + 2, y + 3);
 }
 
-std::vector<Tile> GameOfLife::advance()
+void GameOfLife::advance()
 {
-    std::scoped_lock<std::mutex> lock(m_space_mutex);
+    /// @todo Multithreading with a std::latch, quad tree.
+    /// @bug Alone tiles are not updated.
 
-    std::vector<Tile> tiles {};
+    // Surrounding alive counts of each tile.
+    std::unordered_map<Tile, int> counts;
 
-    // Return the number wrapped around between 0 and n. If a > n, then
-    // repeat a - n until a < n.
+    // Return the number wrapped around between 0 and n. If a > n, then  repeat
+    // a - n until a < n.
     auto wrap = [](int a, int n) {
         return ((a % n) + n) % n;
     };
 
-    // TODO: Optimise by looping through set squares only.
-    for (int y = 0; y < m_height; ++y) {
-        int above = wrap(y - 1, m_height);
-        int below = wrap(y + 1, m_height);
+    // Increment the count of all neighbors of each alive tile.
+    for (auto tile : m_space) {
 
-        for (int x = 0; x < m_width; ++x) {
-            int left = wrap(x - 1, m_width);
-            int right = wrap(x + 1, m_width);
+        // Cardinal neighbors.
+        int above = wrap(tile.y - 1, m_height);
+        int below = wrap(tile.y + 1, m_height);
+        int left = wrap(tile.x - 1, m_width);
+        int right = wrap(tile.x + 1, m_width);
 
-            // Count of white squares.
-            int N = 0;
+        std::array<Tile, 8> neighbors = {
+            Tile(left, above),
+            Tile(tile.x, above),
+            Tile(right, above),
+            Tile(left, tile.y),
+            Tile(right, tile.y),
+            Tile(left, below),
+            Tile(tile.x, below),
+            Tile(right, below)
+        };
 
-            // Loop through surrounding squares.
-            N += m_space[above * m_width + left ];
-            N += m_space[above * m_width + x    ];
-            N += m_space[above * m_width + right];
-            N += m_space[    y * m_width + left ];
-            N += m_space[    y * m_width + right];
-            N += m_space[below * m_width + left ];
-            N += m_space[below * m_width + x    ];
-            N += m_space[below * m_width + right];
+        // Increment all neighbors.
+        for (auto neighbor : neighbors) {
+            auto it = counts.find(neighbor);
 
-            bool alive = m_space[y * m_width + x];
-
-            // These 6 lines of code make up the entire logic of this
-            // simulation!
-            if (alive && (N == 2 || N == 3)) {
+            if (it == counts.end()) {
+                counts.emplace(neighbor, 1);
                 continue;
             }
-            else if (!alive && N == 3) {
-                tiles.emplace_back(x, y, true);
-            }
-            else if (alive) {
-                tiles.emplace_back(x, y, false);
-            }
-        }
+
+            it->second += 1;
+        };
     }
 
-    // Apply changes, after the grid has been fully analysed.
-    for (Tile &tile : tiles)
-        m_space[tile.y * m_width + tile.x] = tile.value;
+    // Lock during write only.
+    std::scoped_lock<std::mutex> lock(m_mutex);
 
-    return tiles;
+    // These lines of code make up the logic of the simulation!
+    for (auto [tile, n] : counts) {
+
+        // If the tile was alive last iteration.
+        auto it = m_space.find(tile);
+        bool alive = it != m_space.end();
+
+        if (alive && (n == 2 || n == 3)) {
+            continue;
+        }
+        else if (!alive && n == 3) {
+            m_space.insert(tile);
+        }
+        else if (alive) {
+            m_space.erase(it);
+        }
+    }
 }
 
-std::vector<Tile> GameOfLife::space()
+std::unordered_set<Tile> GameOfLife::space()
 {
-    std::scoped_lock<std::mutex> space_lock(m_space_mutex);
-
-    std::vector<Tile> space;
-    for (int y = 0; y < m_height; ++y) {
-        for (int x = 0; x < m_width; ++x) {
-            space.emplace_back(x, y, m_space.at(y * m_width + x));
-        }
-    }
-
-    return space;
+    std::scoped_lock<std::mutex> space_lock(m_mutex);
+    return m_space;
 }
 
 void GameOfLife::update(int x, int y, bool value)
 {
-    std::scoped_lock<std::mutex> lock(m_space_mutex);
+    std::scoped_lock<std::mutex> lock(m_mutex);
 
-    if (x > m_width || x < 0) {
+    // If the position is out of bounds then do nothing.
+    if (x > m_width || x < 0 || y > m_height || y < 0) {
         return;
     }
 
-    if (y > m_height || y < 0) {
-        return;
-    }
+    Tile tile {x, y};
 
-    m_space[y * m_width + x] = value;
+    // Try to find the tile if it exists.
+    auto it = m_space.find(tile);
+
+    if (it == m_space.end()) {
+        if (value) {
+            m_space.insert(it, tile);
+        }
+    }
+    else {
+        if (!value) {
+            m_space.erase(it);
+        }
+    }
 }
 
 void GameOfLife::clear()
 {
-    std::scoped_lock<std::mutex> lock(m_space_mutex);
-    m_space = std::vector<bool>(m_width * m_height, false);
+    std::scoped_lock<std::mutex> lock(m_mutex);
+    m_space.clear();
 }

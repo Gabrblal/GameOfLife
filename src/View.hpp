@@ -38,9 +38,9 @@ public:
 
     /**
      * @brief Renders all given tiles.
-     * @param updates The set of tiles to update.
+     * @param tiles The set of alive tiles.
      */
-    void render(std::vector<Tile> updates);
+    void render(std::unordered_set<Tile> tiles);
 
     /**
      * @brief Updates a tile at position (x, y).

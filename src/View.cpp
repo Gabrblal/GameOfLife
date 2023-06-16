@@ -98,6 +98,9 @@ void View::set(int tile_width, int tile_height)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
 
+    m_tile_width = tile_width;
+    m_tile_height = tile_height;
+
     // Each tile has s_padding on all four sides, plus the tile inside of
     // width and height s_tile_size.
     m_texture.create(
@@ -121,7 +124,7 @@ void View::set(int tile_width, int tile_height)
     m_window->setView(m_view);
 }
 
-void View::render(std::vector<Tile> tiles)
+void View::render(std::unordered_set<Tile> tiles)
 {
     WindowLock lock(*m_window, m_mutex);
 
@@ -129,16 +132,23 @@ void View::render(std::vector<Tile> tiles)
     sf::RectangleShape square;
     square.setSize(sf::Vector2f(s_tile_size, s_tile_size));
 
-    for (Tile tile : tiles) {
-        square.setPosition(sf::Vector2f(
-            (2 * tile.x * s_padding) + (s_tile_size * tile.x + s_tile_size / 2),
-            (2 * tile.y * s_padding) + (s_tile_size * tile.y + s_tile_size / 2)
-        ));
+    for (int x = 0; x < m_tile_width; x++) {
+        for (int y = 0; y < m_tile_height; y++) {
 
-        // Change the colour depending on the tile state
-        tile.value ? square.setFillColor(s_colour_alive)
-                   : square.setFillColor(s_colour_dead);
-        m_texture.draw(square);
+            square.setPosition(sf::Vector2f(
+                (2 * x * s_padding) + (s_tile_size * x + s_tile_size / 2),
+                (2 * y * s_padding) + (s_tile_size * y + s_tile_size / 2)
+            ));
+
+            if (tiles.contains(Tile(x, y))) {
+                square.setFillColor(s_colour_alive);
+            }
+            else {
+                square.setFillColor(s_colour_dead);
+            }
+
+            m_texture.draw(square);
+        }
     }
 
     m_texture.display();

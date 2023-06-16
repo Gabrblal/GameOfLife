@@ -62,7 +62,7 @@ void Controller::simulation_thread(std::stop_token stop)
         if (m_paused)
             continue;
 
-        m_view.render(m_model.advance());
+        m_model.advance();
     }
 }
 
@@ -83,6 +83,7 @@ void Controller::view_thread(std::stop_token stop)
         if (stop.stop_requested())
             break;
 
+        m_view.render(m_model.space());
         m_view.display();
     }
 }
