@@ -23,13 +23,9 @@ void GameOfLife::add_glider()
     place(x + 2, y + 3);
 }
 
-void GameOfLife::advance()
+std::array<Tile, 8> GameOfLife::neighbors(Tile tile)
 {
-    /// @todo Multithreading with a std::latch, quad tree.
-    /// @bug Alone tiles are not updated.
-
-    // Surrounding alive counts of each tile.
-    std::unordered_map<Tile, int> counts;
+    // Should probably be inlined.
 
     // Return the number wrapped around between 0 and n. If a > n, then  repeat
     // a - n until a < n.
@@ -37,37 +33,64 @@ void GameOfLife::advance()
         return ((a % n) + n) % n;
     };
 
-    // Increment the count of all neighbors of each alive tile.
+    // Cardinal neighbors.
+    int above = wrap(tile.y - 1, m_height);
+    int below = wrap(tile.y + 1, m_height);
+    int left = wrap(tile.x - 1, m_width);
+    int right = wrap(tile.x + 1, m_width);
+
+    // Starting with north, this is a sequence of compass directions.
+    return {
+        Tile(tile.x, above), // North
+        Tile(right, above),  // North East
+        Tile(right, tile.y), // East
+        Tile(right, below),  // South East
+        Tile(tile.x, below), // South
+        Tile(left, below),   // South West
+        Tile(left, tile.y),  // West
+        Tile(left, above)    // North West
+    };
+}
+
+int GameOfLife::count(Tile tile)
+{
+    int n = 0;
+
+    // Increment all neighbors.
+    for (auto neighbor : neighbors(tile)) {
+        if (m_space.contains(neighbor)) {
+            n++;
+        }
+    };
+
+    return n;
+}
+
+void GameOfLife::advance()
+{
+    /// @todo Multithreading with a std::latch and a thread pool. This algorithm
+    /// is threadable because it only reads from the current game space when
+    /// calculating the next iteration.
+
+    // Surrounding alive counts of each tile.
+    std::unordered_map<Tile, int> counts;
+
     for (auto tile : m_space) {
 
-        // Cardinal neighbors.
-        int above = wrap(tile.y - 1, m_height);
-        int below = wrap(tile.y + 1, m_height);
-        int left = wrap(tile.x - 1, m_width);
-        int right = wrap(tile.x + 1, m_width);
+        int n = 0;
 
-        std::array<Tile, 8> neighbors = {
-            Tile(left, above),
-            Tile(tile.x, above),
-            Tile(right, above),
-            Tile(left, tile.y),
-            Tile(right, tile.y),
-            Tile(left, below),
-            Tile(tile.x, below),
-            Tile(right, below)
-        };
-
-        // Increment all neighbors.
-        for (auto neighbor : neighbors) {
-            auto it = counts.find(neighbor);
-
-            if (it == counts.end()) {
-                counts.emplace(neighbor, 1);
-                continue;
+        // Count the number of alive neighbors. For all the dead neighbors,
+        // count their alive neighbors if they are not already counted.
+        for (auto neighbor : neighbors(tile)) {
+            if (m_space.contains(neighbor)) {
+                n++;
             }
-
-            it->second += 1;
+            else if (!counts.contains(neighbor)) {
+                counts.emplace(neighbor, count(neighbor));
+            }
         };
+
+        counts.emplace(tile, n);
     }
 
     // Lock during write only.

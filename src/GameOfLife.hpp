@@ -121,6 +121,22 @@ public:
 
 private:
 
+    /**
+     * @brief Returns all the neighboring tiles of a tile.
+     * 
+     * @param tile The tile to find the neighbors of.
+     * @return The neighboring tiles.
+     */
+    std::array<Tile, 8> neighbors(Tile tile);
+
+    /**
+     * @brief Returns the number of alive tiles around one.
+     * 
+     * @param tile The tile to count the number of alive tiles around.
+     * @return The number of alive tiles surrounding the tile.
+     */
+    int count(Tile tile);
+
     /// Vector of width * height booleans with the state of each square.
     Space m_space;
 
