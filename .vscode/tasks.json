@@ -48,7 +48,7 @@
             "type": "shell",
             "problemMatcher": [],
             "windows": { "command": ".\\bin\\gameoflife.exe" },
-			"linux"  : { "command": "./bin/gameoflife.exe"}
+			"linux"  : { "command": "./bin/gameoflife"}
         }
     ]
 }
