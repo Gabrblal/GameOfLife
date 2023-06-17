@@ -36,7 +36,7 @@
 			"linux"  : { "command": "./compile.bash" }
         },
         {
-			"label": "Asteroids: Configure",
+			"label": "Game of Life: Configure",
 			"type": "shell",
 			"problemMatcher": [],
 			"options": { "cwd": "${workspaceFolder}/scripts" },
@@ -48,7 +48,7 @@
             "type": "shell",
             "problemMatcher": [],
             "windows": { "command": ".\\bin\\gameoflife.exe" },
-			"linux"  : { "command": "./bin/configure.bash"}
+			"linux"  : { "command": "./bin/gameoflife.exe"}
         }
     ]
 }

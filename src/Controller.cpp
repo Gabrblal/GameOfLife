@@ -8,7 +8,7 @@ Controller::Controller()
     : m_view()
     , m_model(m_view.width() / 20, m_view.height() / 20)
     , m_model_delta(100ms)
-    , m_model_delta_minimum(0s)
+    , m_model_delta_minimum(1us)
     , m_model_delta_maximum(2s)
     , m_view_delta(1s / 144s)
     , m_paused(false)
@@ -72,7 +72,7 @@ void Controller::view_thread(std::stop_token stop)
 
     for (;;) {
 
-        m_model_condition.wait_until(
+        m_view_condition.wait_until(
             lock,
             stop,
             high_resolution_clock::now() + m_view_delta,
