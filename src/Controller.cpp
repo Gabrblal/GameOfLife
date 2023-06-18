@@ -109,7 +109,15 @@ std::size_t Controller::performance()
     time_point now = high_resolution_clock::now();
 
     // Divide number of iterations by number of seconds.
-    n /= duration_cast<duration<double>>(now - last).count();
+    double seconds = duration_cast<duration<double>>(now - last).count();
+
+    // Avoid dividing by zero.
+    if (seconds == 0.0) {
+        return m_performance;
+    }
+
+    // Take average per second.
+    n /= seconds;
 
     // Rolling average over N.
     m_performance -= m_performance / N;
