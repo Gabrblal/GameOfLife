@@ -56,6 +56,12 @@ private:
      */
     void exit();
 
+    /**
+     * @brief Get the number of model iterations in the past second.
+     * @return The number of model iterations.
+     */
+    std::size_t performance();
+
     /// Event handling.
     void handle_key_press(sf::Event &event);
     void handle_key_release(sf::Event &event);
@@ -79,45 +85,51 @@ private:
     /// Thread updating the view of the model.
     std::jthread m_view_thread;
 
-    // Condition variable for notifying the model to perform an update.
+    /// Condition variable for notifying the model to perform an update.
     std::condition_variable_any m_model_condition;
 
-    // Condition variable for notifying the view to render.
+    /// Condition variable for notifying the view to render.
     std::condition_variable_any m_view_condition;
 
-    // Mutex protecting the model condition variable.
+    /// Mutex protecting the model condition variable.
     std::mutex m_model_condition_mutex;
 
-    // Mutex protecting the view condition variable.
+    /// Mutex protecting the view condition variable.
     std::mutex m_view_condition_mutex;
 
-    // The amount of time between model updates.
+    /// The amount of time between model updates.
     std::chrono::microseconds m_model_delta;
 
-    // Minimum increment between model increments.
+    /// Minimum increment between model increments.
     std::chrono::microseconds m_model_delta_minimum;
 
-    // Maximum increment between model increments.
+    /// Maximum increment between model increments.
     std::chrono::microseconds m_model_delta_maximum;
 
-    // The amount of time between screen updates.
+    /// The amount of time between screen updates.
     std::chrono::microseconds m_view_delta;
 
-    // Stop signal to stop and join the model and view threads.
+    /// Stop signal to stop and join the model and view threads.
     std::stop_source m_stop;
 
-    // If the game is currently paused.
+    /// If the game is currently paused.
     std::atomic_bool m_paused;
 
-    // If left key is currently pressed.
+    /// The model iterations used to track performance.
+    std::atomic_size_t m_iterations;
+
+    /// The average number of model iterations.
+    double m_performance;
+
+    /// If left key is currently pressed.
     bool m_left;
 
-    // If the right key is currently pressed.
+    /// If the right key is currently pressed.
     bool m_right;
 
-    // If the up key is currently pressed.
+    /// If the up key is currently pressed.
     bool m_up;
 
-    // If the down key is currently pressed.
+    /// If the down key is currently pressed.
     bool m_down;
 };

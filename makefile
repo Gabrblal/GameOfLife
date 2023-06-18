@@ -18,7 +18,7 @@ OBJECTS = $(patsubst src/%, obj/%, $(patsubst %.cpp, %.o, $(SOURCE)))
 FOLDERS = bin obj $(patsubst src/%, obj/%, $(dir $(SOURCE)))
 
 .PHONY: all debug folders
-all: gameoflife
+all: gameoflife.exe
 
 # For debugging, add the debug flag and do target "all".
 debug: CFLAGS += -g
@@ -30,7 +30,7 @@ folders:
 
 # The executable depends on all object files, that are the source file names
 # with a .o extension.
-gameoflife: $(OBJECTS)
+gameoflife.exe: $(OBJECTS)
 	$(CC) $^ $(LDFLAGS) -o bin/$@
 
 # Each object file depends on it's source file.

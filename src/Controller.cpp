@@ -10,8 +10,10 @@ Controller::Controller()
     , m_model_delta(100ms)
     , m_model_delta_minimum(1us)
     , m_model_delta_maximum(2s)
-    , m_view_delta(1s / 144s)
+    , m_view_delta(1s / 60s)
     , m_paused(false)
+    , m_iterations(0)
+    , m_performance(0)
     , m_left(false)
     , m_right(false)
     , m_up(false)
@@ -63,6 +65,7 @@ void Controller::simulation_thread(std::stop_token stop)
             continue;
 
         m_model.advance();
+        m_iterations++;
     }
 }
 
@@ -86,6 +89,36 @@ void Controller::view_thread(std::stop_token stop)
         m_view.render(m_model.space());
         m_view.display();
     }
+}
+
+std::size_t Controller::performance()
+{
+    using namespace std::chrono;
+    using namespace std::chrono_literals;
+
+    // Rolling average period.
+    const int N = 20;
+
+    // Last iteration sample time.
+    static high_resolution_clock::time_point last;
+
+    // Count and reset the number of model iterations.
+    std::size_t n = m_iterations;
+    m_iterations = 0;
+
+    time_point now = high_resolution_clock::now();
+
+    // Divide number of iterations by number of seconds.
+    n /= duration_cast<duration<double>>(now - last).count();
+
+    // Rolling average over N.
+    m_performance -= m_performance / N;
+    m_performance += n / N;
+
+    // Set the last calculation time.
+    last = now;
+
+    return m_performance;
 }
 
 void Controller::main()
