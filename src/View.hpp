@@ -52,6 +52,12 @@ public:
     void render(int x, int y, bool alive);
 
     /**
+     * @brief Renders the performance of the program.
+     * @param performance The number of iterations in the past second.
+     */
+    void render_performance(std::size_t performance);
+
+    /**
      * @brief Updates the display to the screen, transforming everything
      * rendered to the current texture depending on view position and updating
      * the screen.
@@ -125,6 +131,11 @@ public:
 
 private:
 
+    /**
+     * @brief Loads the font of the program.
+     */
+    void load_font();
+
     /// The window containing the program graphics, and where input is
     /// retrieved.
     std::unique_ptr<sf::RenderWindow> m_window;
@@ -144,6 +155,12 @@ private:
     // The view of the world space. The view defines how the world space is
     // mapped to pixels in the window.
     sf::View m_view;
+
+    /// The font used for rendering text.
+    sf::Font m_font;
+
+    /// Text of the performance 
+    sf::Text m_performance;
 
     /// The tile width of the game space.
     int m_tile_width;

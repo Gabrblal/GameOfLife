@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iostream>
+#include <filesystem>
 
 int View::s_padding = 1;
 int View::s_tile_size = 5;
@@ -63,6 +64,8 @@ View::View()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
 
+    load_font();
+
     // Get the largest fullscreen mode.
     std::vector<sf::VideoMode> modes = sf::VideoMode::getFullscreenModes();
     auto mode = std::max_element(
@@ -92,6 +95,29 @@ View::~View()
 {
     WindowLock window_lock(*m_window, m_mutex);
     m_window->close();
+}
+
+void View::load_font()
+{
+    using namespace std::filesystem;
+
+    path windows = "C:\\Windows\\Fonts";
+    path linux = "/usr/share/fonts/truetype/roboto/unhinted/RobotoCondensed-Regular.ttf";
+
+    bool loaded = (
+        (exists(windows) && m_font.loadFromFile(windows)) ||
+        (exists(linux) && m_font.loadFromFile(linux))
+    );
+
+    if (!loaded) {
+        std::cout << "Unable to find font for rendering text!" << std::endl;
+        std::exit(1);
+    }
+
+    m_performance.setCharacterSize(24);
+    m_performance.setFillColor(sf::Color::White);
+    m_performance.setPosition(m_pixel_width - 200, 0);
+    m_performance.setFont(m_font);
 }
 
 void View::set(int tile_width, int tile_height)
@@ -173,6 +199,12 @@ void View::render(int x, int y, bool value)
     m_texture.draw(square);
 
     m_texture.display();
+}
+
+void View::render_performance(std::size_t performance)
+{
+    m_performance.setString("n/s: " + std::to_string(performance));
+    m_texture.draw(m_performance);
 }
 
 void View::display()
